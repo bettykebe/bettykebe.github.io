@@ -1,0 +1,74 @@
+--drop procedure fhvalidate.sp_update_case_sequence;
+CREATE OR REPLACE PROCEDURE fhvalidate.sp_update_case_sequence(
+	p_scenarioid integer,  ----remove array and keep it in fist position of the parameter
+	p_case_id integer[],
+	p_sequence integer[]
+	)
+LANGUAGE 'plpgsql'
+AS $BODY$
+declare 
+v_scen_cid_counter int;
+BEGIN
+---creating temporary table
+CREATE TEMPORARY TABLE temp_table (case_id INT,sequence_number int );
+---Unnesting and inserting the parameter values  into temp_table
+insert into temp_table
+select a.case_id,a.sequence_number
+from unnest(p_case_id,p_sequence) a(case_id,sequence_number);
+-----Handling wrong input caseid and scenarioid
+select count(*) into v_scen_cid_counter
+from fhvalidate.scenario_case sc,temp_table tp
+where sc.sid=p_scenarioid and sc.cid=tp.case_id;
+
+CALL fhvalidate.sp_update_case_sequence(1,'{2,13}','{1,7}');
+
+if v_scen_cid_counter>0 then
+-----Updating the first table
+update fhvalidate.scenario_case
+set cseq= CASE WHEN temp_table.sequence_number IS NULL 
+          THEN fhvalidate.scenario_case.cseq  ELSE temp_table.sequence_number END
+from temp_table
+where temp_table.case_id=fhvalidate.scenario_case.cid and 
+      fhvalidate.scenario_case.sid=p_scenarioid;
+-----Updating the second table
+Update fhvalidate.result 
+set cseq = CASE WHEN tt.cseq IS NULL 
+           THEN fhvalidate.result.cseq  ELSE tt.sequence_number END
+from temp_table as tt 
+where fhvalidate.result.sid=p_scenarioid  and tt.case_id=fhvalidate.result.cid;
+RAISE NOTICE 'Updated Succesfully';
+else 
+raise notice 'The input Scenario/Case ID is not existed/Please input valid Id';
+end if;
+----Droping temp table--
+drop table  temp_table;
+end;	
+$BODY$ 
+SECURITY DEFINER;
+
+GRANT EXECUTE ON PROCEDURE fhvalidate.sp_update_case_sequence(integer,integer[],integer[])  TO cragavanis;
+
+GRANT EXECUTE ON PROCEDURE fhvalidate.sp_update_case_sequence(integer,integer[],integer[]) TO fhapp;
+
+GRANT EXECUTE ON PROCEDURE fhvalidate.sp_update_case_sequence(integer,integer[],integer[]) TO fho2app;
+
+GRANT EXECUTE ON PROCEDURE fhvalidate.sp_update_case_sequence(integer,integer[],integer[]) TO slemlem;
+
+GRANT EXECUTE ON PROCEDURE fhvalidate.sp_update_case_sequence(integer,integer[],integer[]) TO sol;
+
+REVOKE ALL ON PROCEDURE fhvalidate.sp_update_case_sequence(integer,integer[],integer[])FROM PUBLIC;
+ALTER PROCEDURE fhvalidate.sp_update_case_sequence(integer,integer[],integer[]) OWNER TO slemlem;
+
+/*
+----caaling the procedure 
+CALL fhvalidate.sp_update_case_sequence(1,'{2,13}','{1,7}');
+*/
+
+/*
+CALL fhvalidate.sp_update_case_sequence(1,'{2,13}','{1,7}');
+CALL fhvalidate.sp_update_case_sequence ('{c1,c2}',{s1,s2},{sq1,sq2});
+CALL fhvalidate.sp_update_case_sequence ('{3,6}','{1,1}','{1,3}');
+
+select * from fhvalidate.scenario_case;
+select * from fhvalidate.result;
+*/

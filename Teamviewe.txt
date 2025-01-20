@@ -1,0 +1,14 @@
+svq5fx9m
+execute [dbo].[order_name_retrivale]
+[dbo].[product_export]
+
+declare @target_var int;
+set @target_var=null;
+if isnull(@target_var,0) <>0
+begin
+print 'Target variabile is not null';
+end
+else
+begin
+print 'Target variabile is null';
+end
